@@ -1,0 +1,362 @@
+
+---
+title: "Wide vs Long Data in R"
+author: "Jerson Garcia"
+output:
+  html_document:
+    theme: readable
+    highlight: zenburn
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=T, message=F, warning=F)
+```
+
+# Introduction
+
+Data can be organized in different ways.
+
+Two common formats are **wide data** and **long data**.
+
+Wide data usually has one row for each person or observation and several columns for different measurements.
+
+Long data usually has more rows, but fewer columns. The measurements are stacked into one column.
+
+This tutorial shows how to move between wide and long data using `pivot_longer()` and `pivot_wider()`.
+
+# Packages
+
+We will use `dplyr` and `tidyr`.
+
+```{r}
+library(dplyr)
+library(tidyr)
+```
+
+# Wide Data
+
+Here is a small dataset with student grades.
+
+```{r}
+grades <- data.frame(
+  student=c("Alex","Sam","Taylor"),
+  math=c(90,85,88),
+  science=c(92,81,95),
+  english=c(87,89,91)
+)
+
+grades
+```
+
+This is **wide data**.
+
+Each student has one row, and each subject has its own column.
+
+```text
+student   math   science   english
+Alex       90       92        87
+Sam        85       81        89
+Taylor     88       95        91
+```
+
+# Converting Wide Data to Long Data
+
+We can use `pivot_longer()` to stack the subject columns.
+
+```{r}
+grades.long <- 
+  grades %>% 
+  pivot_longer(
+    cols=c(math,science,english),
+    names_to="subject",
+    values_to="score"
+  )
+
+grades.long
+```
+
+Now each student has several rows.
+
+The subject names are stored in one column called `subject`, and the grades are stored in one column called `score`.
+
+# What Changed?
+
+The original data had:
+
+```{r}
+dim(grades)
+```
+
+The long data has:
+
+```{r}
+dim(grades.long)
+```
+
+The number of rows increased because the three subject columns were stacked.
+
+# Looking at One Student
+
+The long format makes it easy to filter one student.
+
+```{r}
+grades.long %>% 
+  filter(student == "Alex")
+```
+
+Now all of Alex's scores are stored in separate rows.
+
+# Why Long Data Can Be Useful
+
+Long data is useful when we want to summarize values by category.
+
+For example, we can calculate the average score for each subject.
+
+```{r}
+grades.long %>% 
+  group_by(subject) %>% 
+  summarize(avg.score=mean(score))
+```
+
+This is easier because all of the scores are stored in the same `score` column.
+
+# Another Summary
+
+We can also find the highest score for each subject.
+
+```{r}
+grades.long %>% 
+  group_by(subject) %>% 
+  summarize(high.score=max(score))
+```
+
+# Using pivot_longer()
+
+The basic structure is:
+
+```{r eval=FALSE}
+data %>% 
+  pivot_longer(
+    cols=columns_to_stack,
+    names_to="new_name_column",
+    values_to="new_value_column"
+  )
+```
+
+In our example:
+
+```{r eval=FALSE}
+grades %>% 
+  pivot_longer(
+    cols=c(math,science,english),
+    names_to="subject",
+    values_to="score"
+  )
+```
+
+The column names:
+
+```text
+math
+science
+english
+```
+
+become values inside the `subject` column.
+
+# Selecting Columns Another Way
+
+We do not always have to type every column name.
+
+If all columns except `student` should be reshaped, we can use:
+
+```{r}
+grades.long2 <- 
+  grades %>% 
+  pivot_longer(
+    cols=-student,
+    names_to="subject",
+    values_to="score"
+  )
+
+grades.long2
+```
+
+`-student` means use every column except `student`.
+
+# Converting Long Data Back to Wide
+
+We can reverse the process with `pivot_wider()`.
+
+```{r}
+grades.wide <- 
+  grades.long %>% 
+  pivot_wider(
+    names_from=subject,
+    values_from=score
+  )
+
+grades.wide
+```
+
+Now each subject is back in its own column.
+
+# Using pivot_wider()
+
+The basic structure is:
+
+```{r eval=FALSE}
+data %>% 
+  pivot_wider(
+    names_from=category_column,
+    values_from=value_column
+  )
+```
+
+For our grades:
+
+```{r eval=FALSE}
+grades.long %>% 
+  pivot_wider(
+    names_from=subject,
+    values_from=score
+  )
+```
+
+# Wide vs Long
+
+Wide data:
+
+```{r}
+grades
+```
+
+Long data:
+
+```{r}
+grades.long
+```
+
+Wide format is useful when we want to see several measurements side by side.
+
+Long format is useful when we want to group, summarize, or graph one measurement across categories.
+
+# A Common Mistake
+
+If we accidentally include the student column inside pivot_longer(), R will try to combine the character student names with the numeric scores. Since these are different data types, this can cause an error.
+
+For example:
+
+```{r eval=FALSE}
+grades %>% 
+  pivot_longer(
+    cols=everything(),
+    names_to="variable",
+    values_to="value"
+  )
+```
+
+Identifier columns like student should normally stay separate.
+
+
+A better choice is:
+
+```{r eval=FALSE}
+grades %>% 
+  pivot_longer(
+    cols=-student,
+    names_to="subject",
+    values_to="score"
+  )
+```
+
+# Small Example with Years
+
+The same idea can be used for other types of data.
+
+```{r}
+sales <- data.frame(
+  store=c("A","B","C"),
+  `2024`=c(100,120,90),
+  `2025`=c(110,135,105),
+  `2026`=c(125,140,115),
+   check.names=FALSE
+)
+
+sales
+```
+
+This dataset is wide because each year has its own column.
+
+Convert it to long format:
+
+```{r}
+sales.long <- 
+  sales %>% 
+  pivot_longer(
+    cols=-store,
+    names_to="year",
+    values_to="sales"
+  )
+
+sales.long
+```
+
+Now it is easier to compare values by year.
+
+```{r}
+sales.long %>% 
+  group_by(year) %>% 
+  summarize(avg.sales=mean(sales))
+```
+
+# Quick Reference
+
+Wide to long:
+
+```{r eval=FALSE}
+data %>% 
+  pivot_longer(
+    cols=-id,
+    names_to="category",
+    values_to="value"
+  )
+```
+
+Long to wide:
+
+```{r eval=FALSE}
+data %>% 
+  pivot_wider(
+    names_from=category,
+    values_from=value
+  )
+```
+
+Useful functions:
+
+```{r eval=FALSE}
+pivot_longer()
+
+pivot_wider()
+
+group_by()
+
+summarize()
+
+filter()
+```
+
+# Conclusion
+
+Wide and long data contain the same information, but the information is organized differently.
+
+`pivot_longer()` stacks columns into rows.
+
+`pivot_wider()` spreads values back into separate columns.
+
+Knowing how to move between the two formats makes it easier to prepare data for summaries, graphs, and other analysis.
+
+
+
